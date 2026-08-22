@@ -4,10 +4,14 @@ let isConnected = false;
 
 const connectDB = async () => {
   if (isConnected && mongoose.connection.readyState === 1) {
-    return;
+    return true;
   }
 
-  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/water_intake_tracker';
+  const mongoUri = process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    throw new Error('MONGO_URI environment variable is missing in Vercel Dashboard project settings.');
+  }
 
   try {
     const conn = await mongoose.connect(mongoUri, {
@@ -52,21 +56,10 @@ const connectDB = async () => {
     } catch (seedErr) {
       console.warn('[Auto-Seed Warning]', seedErr.message);
     }
+    return true;
   } catch (error) {
-    console.warn(`[Database] MongoDB connection error (${error.message}).`);
-    // In local dev fallback to memory server if installed
-    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-      try {
-        const { MongoMemoryServer } = require('mongodb-memory-server');
-        const mongoServer = await MongoMemoryServer.create();
-        const inMemoryUri = mongoServer.getUri();
-        await mongoose.connect(inMemoryUri);
-        isConnected = true;
-        console.log(`[Database] Mongo Memory Server Connected.`);
-      } catch (memErr) {
-        console.error(`[Database Error] Could not connect to In-Memory Server:`, memErr.message);
-      }
-    }
+    console.error(`[Database Error] MongoDB connection failed: ${error.message}`);
+    throw error;
   }
 };
 
