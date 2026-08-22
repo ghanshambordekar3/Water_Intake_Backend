@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/error.middleware');
 
@@ -16,14 +17,24 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serverless DB Middleware - Ensure DB connection before processing requests
 app.use(async (req, res, next) => {
+  if (req.path === '/') {
+    return next(); // Health check can run without DB
+  }
+
   try {
     await connectDB();
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database Connection Fail: MONGO_URI environment variable is missing or invalid on Vercel Dashboard.',
+      });
+    }
     next();
   } catch (err) {
     console.error('[DB Middleware Error]', err.message);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Database Connection Error. Please check MONGO_URI environment variable.',
+      message: `Database Connection Error: ${err.message}`,
     });
   }
 });
